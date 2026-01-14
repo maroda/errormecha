@@ -1,0 +1,81 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: errormecha
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    serviceMonitorSelector: prometheus
+  name: errormecha
+  namespace: default
+spec:
+  endpoints:
+    - interval: 10s
+      targetPort: 8080
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - errormecha
+  selector:
+    matchLabels:
+      operated-prometheus: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: errormecha
+  namespace: errormecha
+  labels:
+    app: errormecha
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: errormecha
+  template:
+    metadata:
+      labels:
+        app: errormecha
+        version: latest
+    spec:
+      containers:
+        - name: errormecha
+          image: errormecha:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PG_DB
+              value: "devdb"
+            - name: PG_USER
+              value: "devuser"
+            - name: PG_PASS
+              value: "devpass"
+            - name: PG_HOST
+              value: "postgres.local-db.svc.cluster.local"
+            - name: PG_PORT
+              value: "5432"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "125m"
+            limits:
+              memory: "64Mi"
+              cpu: "250m"
